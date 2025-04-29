@@ -1,7 +1,7 @@
-#include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include "compass.h"
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -29,7 +29,16 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 void setup() {
+  delay(1000);
   Serial.begin(9600);
+  while (!Serial) { ; }
+  Serial.println("Starting setup");
+
+  if (init_compass()) {
+    Serial.println("Compass ICM20948 has been initialized");
+  } else {
+    Serial.println("Failed to init Compass ICM20948");
+  }
 
   // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
@@ -57,15 +66,13 @@ void drawNeedleAtAngle(double angleRad) {
   display.drawLine(lineStartX, lineStartY, lineX, lineY, 1);
 }
 
-double angle = 0.0;
-
 void loop() {
   // put your main code here, to run repeatedly:
   display.clearDisplay();
-
+  processCompassData();
+  float heading = getCompassHeading();
   drawCompass();
-  drawNeedleAtAngle(angle);
-  angle += 0.2;
+  drawNeedleAtAngle(heading + M_PI);
 
   display.display();
 }
