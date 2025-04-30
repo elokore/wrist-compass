@@ -29,9 +29,8 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 void setup() {
-  delay(1000);
   Serial.begin(9600);
-  while (!Serial) { ; }
+  delay(1000);
   Serial.println("Starting setup");
 
   if (init_compass()) {
