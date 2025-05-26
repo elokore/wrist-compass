@@ -1,29 +1,20 @@
 #include "compass.h"
 
 Adafruit_ICM20948 icm;
-sensors_event_t accel;
-sensors_event_t gyro;
-sensors_event_t mag;
-sensors_event_t temp;
 
 // Pre-Calibrated compass values
-float minMagX = -74.27;
-float maxMagX = 22.58;
-float minMagY = -45.33;
-float maxMagY = 57.25;
-float minMagZ = -64.22;
-float maxMagZ = 39.35;
+float minMagX = -44.70;
+float maxMagX = 39.30;
+float minMagY = -35.10;
+float maxMagY = 63.00;
+float minMagZ = -65.40;
+float maxMagZ = 28.05;
 
 // Averaging Filters
-float mag_readings_x[FILTER_SIZE];
-float mag_readings_y[FILTER_SIZE];
-float mag_readings_z[FILTER_SIZE];
-float accel_readings_x[FILTER_SIZE];
-float accel_readings_y[FILTER_SIZE];
-float accel_readings_z[FILTER_SIZE];
+float mag_readings[FILTER_SIZE];
+float accel_readings[FILTER_SIZE];
 int mag_filter_index = 0;
 int accel_filter_index = 0;
-bool is_filter_full = false;
 
 // Magnetometer and accelerometer values
 float accelX;
@@ -35,26 +26,12 @@ float magZ;
 
 // ** Internal Functions ** //
 
-void log_mag_reading(float x, float y, float z) {
-    mag_readings_x[mag_filter_index] = x;
-    mag_readings_y[mag_filter_index] = y;
-    mag_readings_z[mag_filter_index] = z;
-  
-    mag_filter_index = (mag_filter_index + 1);
-  
-    if (mag_filter_index == FILTER_SIZE && !is_filter_full) {
-      is_filter_full = true;
-    }
-  
-    mag_filter_index = mag_filter_index % FILTER_SIZE;
-}
-  
-void log_accel_reading(float x, float y, float z) {
-    accel_readings_x[accel_filter_index] = x;
-    accel_readings_y[accel_filter_index] = y;
-    accel_readings_z[accel_filter_index] = z;
-  
-    accel_filter_index = (accel_filter_index + 1) % FILTER_SIZE;
+void log_reading(float readingsLog[], int* filterIndex, float x, float y, float z) {
+  readingsLog[*filterIndex    ] = x;
+  readingsLog[*filterIndex + 1] = y;
+  readingsLog[*filterIndex + 2] = z;
+
+  *filterIndex = (*filterIndex + 3) % FILTER_SIZE;
 }
 
 void calculateCalibratedMagValues(sensors_vec_t rawMagVector, float* x, float* y, float* z) {
@@ -82,15 +59,15 @@ void getFilteredMagReading(float* x, float* y, float* z) {
     float sumY = 0.0;
     float sumZ = 0.0;
   
-    for (int i = 0; i < FILTER_SIZE; i++) {
-      sumX += mag_readings_x[i];
-      sumY += mag_readings_y[i];
-      sumZ += mag_readings_z[i];
+    for (int i = 0; i < FILTER_SIZE; i += 3) {
+      sumX += mag_readings[i];
+      sumY += mag_readings[i + 1];
+      sumZ += mag_readings[i + 2];
     }
   
-    *x = sumX / FILTER_SIZE;
-    *y = sumY / FILTER_SIZE;
-    *z = sumZ / FILTER_SIZE;
+    *x = sumX / FILTER_SIZE / VALUES_PER_SAMPLE;
+    *y = sumY / FILTER_SIZE / VALUES_PER_SAMPLE;
+    *z = sumZ / FILTER_SIZE / VALUES_PER_SAMPLE;
 }
 
 // Provides a reading of the accelerometer that has been filtered to make it less noisy
@@ -99,15 +76,15 @@ void getFilteredAccelReading(float* x, float* y, float* z) {
     float sumY = 0.0;
     float sumZ = 0.0;
   
-    for (int i = 0; i < FILTER_SIZE; i++) {
-      sumX += accel_readings_x[i];
-      sumY += accel_readings_y[i];
-      sumZ += accel_readings_z[i];
+    for (int i = 0; i < FILTER_SIZE; i += 3) {
+      sumX += accel_readings[i];
+      sumY += accel_readings[i + 1];
+      sumZ += accel_readings[i + 2];
     }
   
-    *x = sumX / FILTER_SIZE;
-    *y = sumY / FILTER_SIZE;
-    *z = sumZ / FILTER_SIZE;
+    *x = sumX / FILTER_SIZE / VALUES_PER_SAMPLE;
+    *y = sumY / FILTER_SIZE / VALUES_PER_SAMPLE;
+    *z = sumZ / FILTER_SIZE / VALUES_PER_SAMPLE;
 }
 
 // Compensate for the pitch and roll of the sensor so that 
@@ -127,44 +104,68 @@ void compensateForTilt(float pitch, float roll, float magX, float magY, float ma
 // Returns true if successful, false if the compass cannot be found on the I2C bus.
 bool init_compass() {
     // Init filter arrays
-    memset(mag_readings_x, 0, FILTER_SIZE);
-    memset(mag_readings_y, 0, FILTER_SIZE);
-    memset(mag_readings_z, 0, FILTER_SIZE);
-    memset(accel_readings_x, 0, FILTER_SIZE);
-    memset(accel_readings_y, 0, FILTER_SIZE);
-    memset(accel_readings_z, 0, FILTER_SIZE);
+    memset(mag_readings, 0, FILTER_SIZE);
+    memset(accel_readings, 0, FILTER_SIZE);
 
-    // if (IS_CALIBRATING) {
-    //     maxMagX = -99999.0;
-    //     minMagX = 99999.0;
-    //     maxMagY = -99999.0;
-    //     minMagY = 99999.0;
-    //     maxMagZ = -99999.0;
-    //     minMagZ = 99999.0;
-    // }
+    if (IS_CALIBRATING) {
+        maxMagX = -99999.0;
+        minMagX = 99999.0;
+        maxMagY = -99999.0;
+        minMagY = 99999.0;
+        maxMagZ = -99999.0;
+        minMagZ = 99999.0;
+    }
 
     return icm.begin_I2C();
 }
 
 // Should be called every frame that the compass has a new reading available
 void processCompassData() {
-    bool readSuccess = icm.getEvent(&accel, &gyro, &temp, &mag);
-    if (!readSuccess) return;
+    sensors_event_t mag;
+    sensors_event_t accel;
+
+    bool mag_success = icm.getMagnetometerSensor()->getEvent(&mag);
+    bool accel_success = icm.getAccelerometerSensor()->getEvent(&accel);
+    
+    if (!mag_success) return;
+    if (!accel_success) return;
 
     float cX = 0.0;
     float cY = 0.0;
     float cZ = 0.0;
   
-    // if (IS_CALIBRATING) {
-    //   cX = mag.magnetic.x;
-    //   cY = mag.magnetic.y;
-    //   cZ = mag.magnetic.z;
-    // } else {
+    if (IS_CALIBRATING) {
+      cX = mag.magnetic.x;
+      cY = mag.magnetic.y;
+      cZ = mag.magnetic.z;
+
+      maxMagX = max(maxMagX, cX);
+      minMagX = min(minMagX, cX);
+      maxMagY = max(maxMagY, cY);
+      minMagY = min(minMagY, cY);
+      maxMagZ = max(maxMagZ, cZ);
+      minMagZ = min(minMagZ, cZ);
+
+      Serial.print("MinX: ");
+      Serial.print(minMagX);
+      Serial.print(" MaxX: ");
+      Serial.print(maxMagX);
+
+      Serial.print("MinY: ");
+      Serial.print(minMagY);
+      Serial.print(" MaxY: ");
+      Serial.print(maxMagY);
+
+      Serial.print("MinZ: ");
+      Serial.print(minMagZ);
+      Serial.print(" MaxZ: ");
+      Serial.println(maxMagZ);
+    } else {
       calculateCalibratedMagValues(mag.magnetic, &cX, &cY, &cZ);
-    //}
+    }
   
-    log_mag_reading(cX, cY, cZ);
-    log_accel_reading(accel.acceleration.x, accel.acceleration.y, accel.acceleration.z);
+    log_reading(mag_readings, &mag_filter_index, cX, cY, cZ);
+    log_reading(accel_readings, &accel_filter_index, accel.acceleration.x, accel.acceleration.y, accel.acceleration.z);
 }
 
 // Gets the Pitch and Roll of the compass in radians
@@ -185,7 +186,7 @@ float getCompassHeading() {
     getPitchAndRoll(&pitch, &roll);
     compensateForTilt(pitch, roll, magX, magY, magZ, &comp_mag_x, &comp_mag_y);
   
-    float heading = atan2(comp_mag_y, comp_mag_x);
+    float heading = atan2(-comp_mag_y, comp_mag_x);
     if (heading < 0) { heading += (2 * M_PI); } // Convert to 0-360 range
   
     return heading;

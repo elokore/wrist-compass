@@ -9,6 +9,7 @@
 #define COMPASS_CHAR_PADDING 4
 #define CHAR_WIDTH 5
 #define CHAR_HEIGHT 7
+#define RAD_TO_DEG 180 / M_PI
 
 #define CIRCLE_CENTER_X SCREEN_WIDTH / 2
 #define CIRCLE_CENTER_Y SCREEN_HEIGHT / 2
@@ -69,9 +70,25 @@ void loop() {
   // put your main code here, to run repeatedly:
   display.clearDisplay();
   processCompassData();
-  float heading = getCompassHeading();
+  float pitch = 0.0;
+  float roll = 0.0;
+  float heading = getCompassHeading() - M_PI_2;
+  getPitchAndRoll(&pitch, &roll);
+
+  Serial.print("Pitch: ");
+  Serial.print(pitch);
+  Serial.print(" Roll: ");
+  Serial.println(roll);
+
+  // Render a circle in the center of the compass to indicate how level the compass is
+  int16_t rollSign = roll / abs(roll);
+  int16_t offsetY = pitch * RAD_TO_DEG * 0.5;
+  int16_t offsetX = (abs(roll) - M_PI) * RAD_TO_DEG * rollSign * 0.5;
+  display.drawCircle(CIRCLE_CENTER_X + offsetX, CIRCLE_CENTER_Y + offsetY, 6, 1);
+
+
   drawCompass();
-  drawNeedleAtAngle(heading + M_PI);
+  drawNeedleAtAngle(heading);
 
   display.display();
 }
