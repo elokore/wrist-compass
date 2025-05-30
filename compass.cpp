@@ -146,24 +146,26 @@ void processCompassData() {
       maxMagZ = max(maxMagZ, cZ);
       minMagZ = min(minMagZ, cZ);
 
-      Serial.print("MinX: ");
-      Serial.print(minMagX);
-      Serial.print(" MaxX: ");
-      Serial.print(maxMagX);
+      // Serial.print("MinX: ");
+      // Serial.print(minMagX);
+      // Serial.print(" MaxX: ");
+      // Serial.print(maxMagX);
 
-      Serial.print("MinY: ");
-      Serial.print(minMagY);
-      Serial.print(" MaxY: ");
-      Serial.print(maxMagY);
+      // Serial.print("MinY: ");
+      // Serial.print(minMagY);
+      // Serial.print(" MaxY: ");
+      // Serial.print(maxMagY);
 
-      Serial.print("MinZ: ");
-      Serial.print(minMagZ);
-      Serial.print(" MaxZ: ");
-      Serial.println(maxMagZ);
+      // Serial.print("MinZ: ");
+      // Serial.print(minMagZ);
+      // Serial.print(" MaxZ: ");
+      // Serial.println(maxMagZ);
     } else {
       calculateCalibratedMagValues(mag.magnetic, &cX, &cY, &cZ);
     }
   
+    getFilteredMagReading(&magX, &magY, &magZ);
+    getFilteredAccelReading(&accelX, &accelY, &accelZ);
     log_reading(mag_readings, &mag_filter_index, cX, cY, cZ);
     log_reading(accel_readings, &accel_filter_index, accel.acceleration.x, accel.acceleration.y, accel.acceleration.z);
 }
@@ -180,11 +182,9 @@ float getCompassHeading() {
     float roll = 0.0;
     float comp_mag_x = 0.0;
     float comp_mag_y = 0.0;
-  
-    getFilteredMagReading(&magX, &magY, &magZ);
-    getFilteredAccelReading(&accelX, &accelY, &accelZ);
+
     getPitchAndRoll(&pitch, &roll);
-    compensateForTilt(pitch, roll, magX, magY, magZ, &comp_mag_x, &comp_mag_y);
+    compensateForTilt(abs(pitch), abs(roll), magX, magY, magZ, &comp_mag_x, &comp_mag_y);
   
     float heading = atan2(-comp_mag_y, comp_mag_x);
     if (heading < 0) { heading += (2 * M_PI); } // Convert to 0-360 range

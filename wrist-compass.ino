@@ -49,6 +49,9 @@ void setup() {
   display.clearDisplay();
 }
 
+/*
+  Draws the compass visual, a circle with each of the cardinal directions
+*/
 void drawCompass() {
   display.drawCircle(CIRCLE_CENTER_X, CIRCLE_CENTER_Y, COMPASS_RADIUS, 1);
   display.drawChar(CIRCLE_CENTER_X - (CHAR_WIDTH / 2), CIRCLE_TOP_Y + COMPASS_CHAR_PADDING, 'N', 1, 0, 1);
@@ -57,6 +60,9 @@ void drawCompass() {
   display.drawChar(CIRCLE_LEFT_X + COMPASS_CHAR_PADDING, CIRCLE_CENTER_Y - (CHAR_HEIGHT / 2), 'W', 1, 0, 1);
 }
 
+/*
+  Draws the compass needle rotated at the specified angle
+*/
 void drawNeedleAtAngle(double angleRad) {
   uint8_t lineStartX = CIRCLE_CENTER_X;
   uint8_t lineStartY = CIRCLE_CENTER_Y;
@@ -66,29 +72,37 @@ void drawNeedleAtAngle(double angleRad) {
   display.drawLine(lineStartX, lineStartY, lineX, lineY, 1);
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
-  display.clearDisplay();
-  processCompassData();
-  float pitch = 0.0;
-  float roll = 0.0;
-  float heading = getCompassHeading() - M_PI_2;
-  getPitchAndRoll(&pitch, &roll);
-
-  Serial.print("Pitch: ");
-  Serial.print(pitch);
-  Serial.print(" Roll: ");
-  Serial.println(roll);
-
-  // Render a circle in the center of the compass to indicate how level the compass is
+/*
+  Draws a small circle on the screen. When the device is level the circle will be positioned at
+  the center of the compass. When the compass is tilted the circle will move in the direction of tilt.
+  This is used to show the user how level the device is, the more level it is the more accurate the reading will be
+*/
+void drawLevelIndicator(float pitch, float roll) {
   int16_t rollSign = roll / abs(roll);
   int16_t offsetY = pitch * RAD_TO_DEG * 0.5;
   int16_t offsetX = (abs(roll) - M_PI) * RAD_TO_DEG * rollSign * 0.5;
   display.drawCircle(CIRCLE_CENTER_X + offsetX, CIRCLE_CENTER_Y + offsetY, 6, 1);
+}
 
+void loop() {
+  float pitch = 0.0;
+  float roll = 0.0;
+  float heading = 0.0;
 
-  drawCompass();
-  drawNeedleAtAngle(heading);
+  // put your main code here, to run repeatedly:
+  display.clearDisplay();
+  processCompassData();
+  getPitchAndRoll(&pitch, &roll);
+
+  // Hide display when the user has dropped their arm
+  bool shouldHideDisplay = ((roll * RAD_TO_DEG) < 110 && (roll * RAD_TO_DEG) > 0) && (pitch * RAD_TO_DEG) > -30 && (pitch * RAD_TO_DEG) < 10;
+
+  if (!shouldHideDisplay) {
+    heading = getCompassHeading() - M_PI_2;
+    drawLevelIndicator(pitch, roll);
+    drawCompass();
+    drawNeedleAtAngle(heading);
+  }
 
   display.display();
 }
