@@ -28,6 +28,7 @@
 #define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 #define SCREEN_ADDRESS 0x3D ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+bool isCalibrating = false;
 
 void setup() {
   Serial.begin(9600);
@@ -52,18 +53,13 @@ void setup() {
 /*
   Draws the compass visual, a circle with each of the cardinal directions
 */
-void drawCompass() {
+void drawCompass(double angleRad) {
   display.drawCircle(CIRCLE_CENTER_X, CIRCLE_CENTER_Y, COMPASS_RADIUS, 1);
   display.drawChar(CIRCLE_CENTER_X - (CHAR_WIDTH / 2), CIRCLE_TOP_Y + COMPASS_CHAR_PADDING, 'N', 1, 0, 1);
   display.drawChar(CIRCLE_RIGHT_X - CHAR_WIDTH - COMPASS_CHAR_PADDING, CIRCLE_CENTER_Y - (CHAR_HEIGHT / 2), 'E', 1, 0, 1);
   display.drawChar(CIRCLE_CENTER_X - (CHAR_WIDTH / 2), CIRCLE_BOTTOM_Y - CHAR_HEIGHT - COMPASS_CHAR_PADDING, 'S', 1, 0, 1);
   display.drawChar(CIRCLE_LEFT_X + COMPASS_CHAR_PADDING, CIRCLE_CENTER_Y - (CHAR_HEIGHT / 2), 'W', 1, 0, 1);
-}
 
-/*
-  Draws the compass needle rotated at the specified angle
-*/
-void drawNeedleAtAngle(double angleRad) {
   uint8_t lineStartX = CIRCLE_CENTER_X;
   uint8_t lineStartY = CIRCLE_CENTER_Y;
 
@@ -91,7 +87,7 @@ void loop() {
 
   // put your main code here, to run repeatedly:
   display.clearDisplay();
-  processCompassData();
+  processCompassData(isCalibrating);
   getPitchAndRoll(&pitch, &roll);
 
   // Hide display when the user has dropped their arm
@@ -100,8 +96,7 @@ void loop() {
   if (!shouldHideDisplay) {
     heading = getCompassHeading() - M_PI_2;
     drawLevelIndicator(pitch, roll);
-    drawCompass();
-    drawNeedleAtAngle(heading);
+    drawCompass(heading);
   }
 
   display.display();

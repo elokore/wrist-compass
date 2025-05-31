@@ -107,44 +107,31 @@ bool init_compass() {
     memset(mag_readings, 0, FILTER_SIZE);
     memset(accel_readings, 0, FILTER_SIZE);
 
-    if (IS_CALIBRATING) {
-        maxMagX = -99999.0;
-        minMagX = 99999.0;
-        maxMagY = -99999.0;
-        minMagY = 99999.0;
-        maxMagZ = -99999.0;
-        minMagZ = 99999.0;
-    }
+    // if (IS_CALIBRATING) {
+    //     maxMagX = -99999.0;
+    //     minMagX = 99999.0;
+    //     maxMagY = -99999.0;
+    //     minMagY = 99999.0;
+    //     maxMagZ = -99999.0;
+    //     minMagZ = 99999.0;
+    // }
 
     return icm.begin_I2C();
 }
 
 // Should be called every frame that the compass has a new reading available
-void processCompassData() {
+void processCompassData(bool isCalibrating) {
     sensors_event_t mag;
-    sensors_event_t accel;
-
     bool mag_success = icm.getMagnetometerSensor()->getEvent(&mag);
-    bool accel_success = icm.getAccelerometerSensor()->getEvent(&accel);
-    
     if (!mag_success) return;
-    if (!accel_success) return;
-
-    float cX = 0.0;
-    float cY = 0.0;
-    float cZ = 0.0;
   
-    if (IS_CALIBRATING) {
-      cX = mag.magnetic.x;
-      cY = mag.magnetic.y;
-      cZ = mag.magnetic.z;
-
-      maxMagX = max(maxMagX, cX);
-      minMagX = min(minMagX, cX);
-      maxMagY = max(maxMagY, cY);
-      minMagY = min(minMagY, cY);
-      maxMagZ = max(maxMagZ, cZ);
-      minMagZ = min(minMagZ, cZ);
+    if (isCalibrating) {
+      maxMagX = max(maxMagX, mag.magnetic.x);
+      minMagX = min(minMagX, mag.magnetic.x);
+      maxMagY = max(maxMagY, mag.magnetic.y);
+      minMagY = min(minMagY, mag.magnetic.y);
+      maxMagZ = max(maxMagZ, mag.magnetic.z);
+      minMagZ = min(minMagZ, mag.magnetic.z);
 
       // Serial.print("MinX: ");
       // Serial.print(minMagX);
@@ -161,13 +148,22 @@ void processCompassData() {
       // Serial.print(" MaxZ: ");
       // Serial.println(maxMagZ);
     } else {
+      sensors_event_t accel;
+      float cX = 0.0;
+      float cY = 0.0;
+      float cZ = 0.0;
+
+      bool accel_success = icm.getAccelerometerSensor()->getEvent(&accel);
+      if (!accel_success) return;
+
       calculateCalibratedMagValues(mag.magnetic, &cX, &cY, &cZ);
+      getFilteredMagReading(&magX, &magY, &magZ);
+      getFilteredAccelReading(&accelX, &accelY, &accelZ);
+      log_reading(mag_readings, &mag_filter_index, cX, cY, cZ);
+      log_reading(accel_readings, &accel_filter_index, accel.acceleration.x, accel.acceleration.y, accel.acceleration.z);
     }
   
-    getFilteredMagReading(&magX, &magY, &magZ);
-    getFilteredAccelReading(&accelX, &accelY, &accelZ);
-    log_reading(mag_readings, &mag_filter_index, cX, cY, cZ);
-    log_reading(accel_readings, &accel_filter_index, accel.acceleration.x, accel.acceleration.y, accel.acceleration.z);
+    
 }
 
 // Gets the Pitch and Roll of the compass in radians

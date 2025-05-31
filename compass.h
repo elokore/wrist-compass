@@ -6,13 +6,12 @@
 #include <Adafruit_Sensor.h>
 #include <math.h>
 
-#define IS_CALIBRATING false
 #define VALUES_PER_SAMPLE 3
 #define FILTER_SIZE 6 * VALUES_PER_SAMPLE
 
 bool init_compass();
 void getPitchAndRoll(float* pitch, float* roll);
 float getCompassHeading();
-void processCompassData();
+void processCompassData(bool isCalibrating);
 
 #endif
