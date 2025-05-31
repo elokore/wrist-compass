@@ -19,32 +19,28 @@
 
 #define CIRCLE_LEFT_X CIRCLE_CENTER_X - COMPASS_RADIUS
 #define CIRCLE_RIGHT_X CIRCLE_CENTER_X + COMPASS_RADIUS
+#define CALIBRATE_BUTTON 6
 
-// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
-// The pins for I2C are defined by the Wire-library. 
-// On an arduino UNO:       A4(SDA), A5(SCL)
-// On an arduino MEGA 2560: 20(SDA), 21(SCL)
-// On an arduino LEONARDO:   2(SDA),  3(SCL), ...
 #define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 #define SCREEN_ADDRESS 0x3D ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 bool isCalibrating = false;
+bool debounce = false;
 
 void setup() {
-  Serial.begin(9600);
-  delay(1000);
-  Serial.println("Starting setup");
+  //delay(1000);
+  //Serial.println("Starting setup");
 
-  if (init_compass()) {
-    Serial.println("Compass ICM20948 has been initialized");
-  } else {
-    Serial.println("Failed to init Compass ICM20948");
+  if (!init_compass()) {
+    while(1);
   }
+
+  pinMode(CALIBRATE_BUTTON, INPUT_PULLUP);
 
   // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-    Serial.println(F("SSD1306 allocation failed"));
-    for(;;); // Don't proceed, loop forever
+    //Serial.println(F("SSD1306 allocation failed"));
+    while(1); // Don't proceed, loop forever
   }
 
   display.clearDisplay();
@@ -85,18 +81,39 @@ void loop() {
   float roll = 0.0;
   float heading = 0.0;
 
+  if (digitalRead(CALIBRATE_BUTTON) == 0) {
+    if (!debounce) {
+      debounce = true;
+      isCalibrating = !isCalibrating;
+
+      if (isCalibrating) {
+        resetCalibration();
+      }
+    }
+  } else {
+    debounce = false;
+  }
+
   // put your main code here, to run repeatedly:
   display.clearDisplay();
   processCompassData(isCalibrating);
-  getPitchAndRoll(&pitch, &roll);
 
-  // Hide display when the user has dropped their arm
-  bool shouldHideDisplay = ((roll * RAD_TO_DEG) < 110 && (roll * RAD_TO_DEG) > 0) && (pitch * RAD_TO_DEG) > -30 && (pitch * RAD_TO_DEG) < 10;
+  if (isCalibrating) {
+    display.setCursor(0, 0);
+    display.setTextColor(1);
+    display.setTextSize(1);
+    display.println("Rotate device slowly in all directions to calibrate");
+  } else {
+    getPitchAndRoll(&pitch, &roll);
 
-  if (!shouldHideDisplay) {
-    heading = getCompassHeading() - M_PI_2;
-    drawLevelIndicator(pitch, roll);
-    drawCompass(heading);
+    // Hide display when the user has dropped their arm
+    bool shouldHideDisplay = ((roll * RAD_TO_DEG) < 110 && (roll * RAD_TO_DEG) > 0) && (pitch * RAD_TO_DEG) > -30 && (pitch * RAD_TO_DEG) < 10;
+
+    if (!shouldHideDisplay) {
+      heading = getCompassHeading() - M_PI_2;
+      drawLevelIndicator(pitch, roll);
+      drawCompass(heading);
+    }
   }
 
   display.display();

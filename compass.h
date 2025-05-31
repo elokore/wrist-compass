@@ -13,5 +13,6 @@ bool init_compass();
 void getPitchAndRoll(float* pitch, float* roll);
 float getCompassHeading();
 void processCompassData(bool isCalibrating);
+void resetCalibration();
 
 #endif
